@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LEGO Base 10 3D - Optimizado 60FPS</title>
+    <style>
+        :root {
+            --u-color: #2563eb;
+            --d-color: #16a34a;
+            --c-color: #f59e0b;
+            --um-color: #e11d48;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #cbd5e1;
+            touch-action: none;
+        }
+
+        /* Panel Superior Ultra Compacto */
+        #ui-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            padding: 8px 14px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+            border: 2px solid #6366f1;
+            z-index: 10;
+            width: 95%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        h1 {
+            margin: 0;
+            color: #1e293b;
+            font-size: 0.95rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        #marcador {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #f59e0b;
+            line-height: 1;
+        }
+
+        /* Desglose Posicional */
+        .breakdown-bar {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-bottom: 6px;
+        }
+
+        .badge-pos {
+            padding: 2px 7px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .b-um { background-color: var(--um-color); }
+        .b-c  { background-color: var(--c-color); }
+        .b-d  { background-color: var(--d-color); }
+        .b-u  { background-color: var(--u-color); }
+
+        /* Selector de Pieza */
+        .lego-selector {
+            display: flex;
+            gap: 4px;
+            background: #e2e8f0;
+            padding: 3px;
+            border-radius: 10px;
+            margin-bottom: 6px;
+        }
+
+        .btn-piece {
+            flex: 1;
+            padding: 5px 2px;
+            border: 2px solid transparent;
+            border-radius: 7px;
+            background: transparent;
+            font-size: 0.76rem;
+            font-weight: 800;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.12s ease;
+            white-space: nowrap;
+        }
+
+        .btn-piece.active {
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.18);
+        }
+
+        .btn-piece[data-type="u"].active  { background: var(--u-color); border-color: #1d4ed8; }
+        .btn-piece[data-type="d"].active  { background: var(--d-color); border-color: #15803d; }
+        .btn-piece[data-type="c"].active  { background: var(--c-color); border-color: #d97706; }
+        .btn-piece[data-type="um"].active { background: var(--um-color); border-color: #be123c; }
+
+        /* Herramientas */
+        .tools-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-tool {
+            flex: 1;
+            padding: 6px 8px;
+            font-size: 0.82rem;
+            font-weight: 800;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            color: white;
+            transition: all 0.12s;
+        }
+
+        .btn-build { background: #10b981; }
+        .btn-build.active { background: #059669; border-color: #047857; }
+
+        .btn-delete { background: #ef4444; }
+        .btn-delete.active { background: #dc2626; border-color: #b91c1c; }
+
+        .btn-clear {
+            flex: 0 0 38px;
+            background: #64748b;
+        }
+        .btn-clear:hover { background: #475569; }
+
+        /* Barra de Orientación / Rotar Pieza */
+        .btn-rotate {
+            flex: 0 0 74px;
+            background: #8b5cf6;
+        }
+        .btn-rotate:hover { background: #7c3aed; }
+
+        /* Indicador Inferior */
+        .instrucciones {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.75);
+            color: white;
+            padding: 4px 14px;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+    </style>
+
+    <!-- Three.js + OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="ui-container">
+        <div class="header-row">
+            <h1>🧱 Taller LEGO Base 10</h1>
+            <div id="marcador">0</div>
+        </div>
+
+        <div class="breakdown-bar">
+            <span class="badge-pos b-um"><span id="count-um">0</span> UM</span>
+            <span class="badge-pos b-c"><span id="count-c">0</span> C</span>
+            <span class="badge-pos b-d"><span id="count-d">0</span> D</span>
+            <span class="badge-pos b-u"><span id="count-u">0</span> U</span>
+        </div>
+
+        <!-- Selector de Pieza -->
+        <div class="lego-selector">
+            <button class="btn-piece active" data-type="u" onclick="setPiece('u')">Unidad (1)</button>
+            <button class="btn-piece" data-type="d" onclick="setPiece('d')">Decena (10)</button>
+            <button class="btn-piece" data-type="c" onclick="setPiece('c')">Centena (100)</button>
+            <button class="btn-piece" data-type="um" onclick="setPiece('um')">Millar (1000)</button>
+        </div>
+
+        <!-- Herramientas -->
+        <div class="tools-row">
+            <button class="btn-tool btn-build active" id="tool-build" onclick="setTool('build')">🧱 Poner</button>
+            <button class="btn-tool btn-rotate" id="btn-rot" onclick="rotatePiece()">🔄 Girar</button>
+            <button class="btn-tool btn-delete" id="tool-delete" onclick="setTool('delete')">🔨 Quitar</button>
+            <button class="btn-tool btn-clear" onclick="limpiar()" title="Limpiar Todo">🗑️</button>
+        </div>
+    </div>
+
+    <div class="instrucciones">
+        🖱️ Clic izquierdo: Poner/Quitar | 🖱️ Clic derecho o 2 dedos: Girar vista 3D
+    </div>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let groundPlane;
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        // Estado
+        let activePiece = 'u';
+        let activeTool = 'build';
+        let rotated = false; // true = 90 grados en Y para decenas
+
+        const placedBlocks = [];
+        const clickableMeshes = [];
+
+        let ghostMesh;
+
+        // Configuraciones de piezas (Dimensiones enteras exactas)
+        const pieceConfigs = {
+            u:  { size: [1, 1, 1],   color: 0x2563eb, val: 1 },
+            d:  { size: [1, 1, 10],  color: 0x16a34a, val: 10 },
+            c:  { size: [10, 1, 10], color: 0xf59e0b, val: 100 },
+            um: { size: [10, 10, 10], color: 0xe11d48, val: 1000 }
+        };
+
+        // Materiales compartidos para evitar recreación y consumo de GPU
+        const sharedMaterials = {
+            u:  new THREE.MeshLambertMaterial({ color: pieceConfigs.u.color }),
+            d:  new THREE.MeshLambertMaterial({ color: pieceConfigs.d.color }),
+            c:  new THREE.MeshLambertMaterial({ color: pieceConfigs.c.color }),
+            um: new THREE.MeshLambertMaterial({ color: pieceConfigs.um.color }),
+            ghost: new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45, wireframe: false })
+        };
+
+        // Geometrías base precacheadas
+        const sharedGeometries = {
+            u:  new THREE.BoxGeometry(0.96, 0.96, 0.96),
+            d_z: new THREE.BoxGeometry(0.96, 0.96, 9.96),
+            d_x: new THREE.BoxGeometry(9.96, 0.96, 0.96),
+            c:  new THREE.BoxGeometry(9.96, 0.96, 9.96),
+            um: new THREE.BoxGeometry(9.96, 9.96, 9.96)
+        };
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xe2e8f0);
+
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 500);
+            camera.position.set(0, 32, 45);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Optimiza rendimiento en pantallas Retina/4K
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = false; // Desactivar sombras pesadas para garantizar 60fps estables
+            document.body.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.08;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05;
+            // Separación de controles: rotación solo con botón derecho o 2 dedos
+            controls.mouseButtons = {
+                LEFT: null,
+                MIDDLE: THREE.MOUSE.DOLLY,
+                RIGHT: THREE.MOUSE.ROTATE
+            };
+
+            // Luces eficientes
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x64748b, 0.85);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(20, 40, 20);
+            scene.add(dirLight);
+
+            // Suelo de Colisión Plano
+            const floorGeo = new THREE.PlaneGeometry(60, 60);
+            const floorMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8, depthWrite: false });
+            groundPlane = new THREE.Mesh(floorGeo, floorMat);
+            groundPlane.rotation.x = -Math.PI / 2;
+            scene.add(groundPlane);
+            clickableMeshes.push(groundPlane);
+
+            // Cuadrícula visual ligera
+            const grid = new THREE.GridHelper(60, 60, 0x475569, 0xcbd5e1);
+            grid.position.y = 0.01;
+            scene.add(grid);
+
+            // Crear bloque fantasma
+            updateGhostMesh();
+
+            // Eventos
+            window.addEventListener('resize', onWindowResize, false);
+            renderer.domElement.addEventListener('pointermove', onPointerMove, false);
+            renderer.domElement.addEventListener('pointerdown', onPointerDown, false);
+
+            updateScore();
+        }
+
+        // --- MANEJO DE HERRAMIENTAS ---
+        function setPiece(type) {
+            activePiece = type;
+            document.querySelectorAll('.btn-piece').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.type === type);
+            });
+            setTool('build');
+            updateGhostMesh();
+        }
+
+        function rotatePiece() {
+            rotated = !rotated;
+            updateGhostMesh();
+        }
+
+        function setTool(tool) {
+            activeTool = tool;
+            document.getElementById('tool-build').classList.toggle('active', tool === 'build');
+            document.getElementById('tool-delete').classList.toggle('active', tool === 'delete');
+            if (ghostMesh) ghostMesh.visible = (tool === 'build');
+        }
+
+        function limpiar() {
+            placedBlocks.forEach(b => scene.remove(b.mesh));
+            placedBlocks.length = 0;
+            clickableMeshes.length = 1; // Solo el piso
+            updateScore();
+        }
+
+        // --- GEOMETRÍAS DINÁMICAS PRECOMPILADAS ---
+        function getGeometryForPiece(type, isRotated) {
+            if (type === 'd') {
+                return isRotated ? sharedGeometries.d_x : sharedGeometries.d_z;
+            }
+            return sharedGeometries[type];
+        }
+
+        function getSizeForPiece(type, isRotated) {
+            const base = [...pieceConfigs[type].size];
+            if (type === 'd' && isRotated) {
+                return [base[2], base[1], base[0]];
+            }
+            return base;
+        }
+
+        function updateGhostMesh() {
+            if (ghostMesh) scene.remove(ghostMesh);
+            const geo = getGeometryForPiece(activePiece, rotated);
+            ghostMesh = new THREE.Mesh(geo, sharedMaterials.ghost);
+            ghostMesh.visible = (activeTool === 'build');
+            scene.add(ghostMesh);
+        }
+
+        // --- INTERACCIÓN Y ENCASTRE MODULAR (SNAP RÁPIDO) ---
+        function onPointerMove(event) {
+            if (activeTool !== 'build' || !ghostMesh) return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(clickableMeshes, false);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const normal = hit.face.normal;
+
+                const [sx, sy, sz] = getSizeForPiece(activePiece, rotated);
+
+                // Calcular posición modular exacta sin flotación
+                const targetPoint = hit.point.clone().addScaledVector(normal, 0.05);
+
+                let snapX = Math.round(targetPoint.x);
+                let snapZ = Math.round(targetPoint.z);
+
+                // Ajuste de centro para piezas de ancho par
+                if (sx % 2 === 0) snapX = Math.floor(targetPoint.x) + 0.5 * (targetPoint.x >= 0 ? 1 : -1);
+                if (sz % 2 === 0) snapZ = Math.floor(targetPoint.z) + 0.5 * (targetPoint.z >= 0 ? 1 : -1);
+
+                const snapY = Math.max(0, Math.floor(targetPoint.y));
+
+                ghostMesh.position.set(snapX, snapY + sy / 2, snapZ);
+                ghostMesh.visible = true;
+            } else {
+                ghostMesh.visible = false;
+            }
+        }
+
+        function onPointerDown(event) {
+            if (event.button !== 0) return; // Solo clic izquierdo
+
+            // Evitar clics si se presiona la UI
+            const ui = document.getElementById('ui-container');
+            const rect = ui.getBoundingClientRect();
+            if (event.clientX >= rect.left && event.clientX <= rect.right &&
+                event.clientY >= rect.top && event.clientY <= rect.bottom) {
+                return;
+            }
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(clickableMeshes, false);
+
+            if (intersects.length === 0) return;
+
+            const hit = intersects[0];
+
+            if (activeTool === 'build') {
+                if (!ghostMesh.visible) return;
+
+                const geo = getGeometryForPiece(activePiece, rotated);
+                const mat = sharedMaterials[activePiece];
+                const blockMesh = new THREE.Mesh(geo, mat);
+
+                blockMesh.position.copy(ghostMesh.position);
+
+                // Bordes oscuros optimizados
+                const wireframeEdges = new THREE.LineSegments(
+                    new THREE.EdgesGeometry(geo),
+                    new THREE.LineBasicMaterial({ color: 0x000000, opacity: 0.35, transparent: true })
+                );
+                blockMesh.add(wireframeEdges);
+
+                scene.add(blockMesh);
+
+                clickableMeshes.push(blockMesh);
+                placedBlocks.push({
+                    type: activePiece,
+                    val: pieceConfigs[activePiece].val,
+                    mesh: blockMesh
+                });
+
+                updateScore();
+
+                // Forzar recalculado de posición de fantasma para poner piezas en ráfaga
+                onPointerMove(event);
+
+            } else if (activeTool === 'delete') {
+                if (hit.object === groundPlane) return;
+
+                const blockMesh = hit.object;
+                const index = placedBlocks.findIndex(b => b.mesh === blockMesh);
+                if (index !== -1) {
+                    placedBlocks.splice(index, 1);
+                }
+
+                const meshIdx = clickableMeshes.indexOf(blockMesh);
+                if (meshIdx !== -1) clickableMeshes.splice(meshIdx, 1);
+
+                scene.remove(blockMesh);
+                updateScore();
+            }
+        }
+
+        // --- ACTUALIZAR CONTADORES ---
+        function updateScore() {
+            let total = 0;
+            let countUM = 0, countC = 0, countD = 0, countU = 0;
+
+            placedBlocks.forEach(b => {
+                total += b.val;
+                if (b.type === 'um') countUM++;
+                if (b.type === 'c')  countC++;
+                if (b.type === 'd')  countD++;
+                if (b.type === 'u')  countU++;
+            });
+
+            document.getElementById('marcador').innerText = total.toLocaleString('es-ES');
+            document.getElementById('count-um').innerText = countUM;
+            document.getElementById('count-c').innerText = countC;
+            document.getElementById('count-d').innerText = countD;
+            document.getElementById('count-u').innerText = countU;
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
