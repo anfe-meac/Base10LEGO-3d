@@ -228,14 +228,14 @@
         // Estado
         let activePiece = 'u';
         let activeTool = 'build';
-        let rotated = false; // true = 90 grados en Y para decenas
+        let rotated = false; 
 
         const placedBlocks = [];
         const clickableMeshes = [];
 
         let ghostMesh;
 
-        // Configuraciones de piezas (Dimensiones enteras exactas)
+        // Configuraciones de piezas
         const pieceConfigs = {
             u:  { size: [1, 1, 1],   color: 0x2563eb, val: 1 },
             d:  { size: [1, 1, 10],  color: 0x16a34a, val: 10 },
@@ -243,12 +243,46 @@
             um: { size: [10, 10, 10], color: 0xe11d48, val: 1000 }
         };
 
-        // Materiales compartidos para evitar recreación y consumo de GPU
+        // Función para generar texturas con líneas de separación de cubitos (Base 10)
+        function createGridTexture(baseColorHex, repeatX, repeatZ) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128 * repeatX;
+            canvas.height = 128 * repeatZ;
+            const ctx = canvas.getContext('2d');
+
+            // Color base del bloque
+            ctx.fillStyle = '#' + baseColorHex.toString(16).padStart(6, '0');
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Dibujar líneas divisorias simulando los cubos pequeños de la cuadrícula Base 10
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
+            ctx.lineWidth = 4;
+
+            for (let i = 0; i <= repeatX; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * 128, 0);
+                ctx.lineTo(i * 128, canvas.height);
+                ctx.stroke();
+            }
+            for (let j = 0; j <= repeatZ; j++) {
+                ctx.beginPath();
+                ctx.moveTo(0, j * 128);
+                ctx.lineTo(canvas.width, j * 128);
+                ctx.stroke();
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            return texture;
+        }
+
+        // Materiales con texturas texturizadas para mostrar la división de cubitos
         const sharedMaterials = {
-            u:  new THREE.MeshLambertMaterial({ color: pieceConfigs.u.color }),
-            d:  new THREE.MeshLambertMaterial({ color: pieceConfigs.d.color }),
-            c:  new THREE.MeshLambertMaterial({ color: pieceConfigs.c.color }),
-            um: new THREE.MeshLambertMaterial({ color: pieceConfigs.um.color }),
+            u: new THREE.MeshLambertMaterial({ color: pieceConfigs.u.color }),
+            d: new THREE.MeshLambertMaterial({ map: createGridTexture(pieceConfigs.d.color, 1, 10) }),
+            c: new THREE.MeshLambertMaterial({ map: createGridTexture(pieceConfigs.c.color, 10, 10) }),
+            um: new THREE.MeshLambertMaterial({ map: createGridTexture(pieceConfigs.um.color, 10, 10) }),
             ghost: new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45, wireframe: false })
         };
 
@@ -272,23 +306,21 @@
             camera.position.set(0, 32, 45);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Optimiza rendimiento en pantallas Retina/4K
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = false; // Desactivar sombras pesadas para garantizar 60fps estables
+            renderer.shadowMap.enabled = false;
             document.body.appendChild(renderer.domElement);
 
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.08;
             controls.maxPolarAngle = Math.PI / 2 - 0.05;
-            // Separación de controles: rotación solo con botón derecho o 2 dedos
             controls.mouseButtons = {
                 LEFT: null,
                 MIDDLE: THREE.MOUSE.DOLLY,
                 RIGHT: THREE.MOUSE.ROTATE
             };
 
-            // Luces eficientes
             const hemiLight = new THREE.HemisphereLight(0xffffff, 0x64748b, 0.85);
             scene.add(hemiLight);
 
@@ -296,7 +328,6 @@
             dirLight.position.set(20, 40, 20);
             scene.add(dirLight);
 
-            // Suelo de Colisión Plano
             const floorGeo = new THREE.PlaneGeometry(60, 60);
             const floorMat = new THREE.MeshBasicMaterial({ color: 0x94a3b8, depthWrite: false });
             groundPlane = new THREE.Mesh(floorGeo, floorMat);
@@ -304,15 +335,12 @@
             scene.add(groundPlane);
             clickableMeshes.push(groundPlane);
 
-            // Cuadrícula visual ligera
             const grid = new THREE.GridHelper(60, 60, 0x475569, 0xcbd5e1);
             grid.position.y = 0.01;
             scene.add(grid);
 
-            // Crear bloque fantasma
             updateGhostMesh();
 
-            // Eventos
             window.addEventListener('resize', onWindowResize, false);
             renderer.domElement.addEventListener('pointermove', onPointerMove, false);
             renderer.domElement.addEventListener('pointerdown', onPointerDown, false);
@@ -320,7 +348,6 @@
             updateScore();
         }
 
-        // --- MANEJO DE HERRAMIENTAS ---
         function setPiece(type) {
             activePiece = type;
             document.querySelectorAll('.btn-piece').forEach(btn => {
@@ -345,11 +372,10 @@
         function limpiar() {
             placedBlocks.forEach(b => scene.remove(b.mesh));
             placedBlocks.length = 0;
-            clickableMeshes.length = 1; // Solo el piso
+            clickableMeshes.length = 1; 
             updateScore();
         }
 
-        // --- GEOMETRÍAS DINÁMICAS PRECOMPILADAS ---
         function getGeometryForPiece(type, isRotated) {
             if (type === 'd') {
                 return isRotated ? sharedGeometries.d_x : sharedGeometries.d_z;
@@ -373,7 +399,6 @@
             scene.add(ghostMesh);
         }
 
-        // --- INTERACCIÓN Y ENCASTRE MODULAR (SNAP RÁPIDO) ---
         function onPointerMove(event) {
             if (activeTool !== 'build' || !ghostMesh) return;
 
@@ -389,13 +414,11 @@
 
                 const [sx, sy, sz] = getSizeForPiece(activePiece, rotated);
 
-                // Calcular posición modular exacta sin flotación
                 const targetPoint = hit.point.clone().addScaledVector(normal, 0.05);
 
                 let snapX = Math.round(targetPoint.x);
                 let snapZ = Math.round(targetPoint.z);
 
-                // Ajuste de centro para piezas de ancho par
                 if (sx % 2 === 0) snapX = Math.floor(targetPoint.x) + 0.5 * (targetPoint.x >= 0 ? 1 : -1);
                 if (sz % 2 === 0) snapZ = Math.floor(targetPoint.z) + 0.5 * (targetPoint.z >= 0 ? 1 : -1);
 
@@ -409,9 +432,8 @@
         }
 
         function onPointerDown(event) {
-            if (event.button !== 0) return; // Solo clic izquierdo
+            if (event.button !== 0) return; 
 
-            // Evitar clics si se presiona la UI
             const ui = document.getElementById('ui-container');
             const rect = ui.getBoundingClientRect();
             if (event.clientX >= rect.left && event.clientX <= rect.right &&
@@ -438,7 +460,6 @@
 
                 blockMesh.position.copy(ghostMesh.position);
 
-                // Bordes oscuros optimizados
                 const wireframeEdges = new THREE.LineSegments(
                     new THREE.EdgesGeometry(geo),
                     new THREE.LineBasicMaterial({ color: 0x000000, opacity: 0.35, transparent: true })
@@ -455,8 +476,6 @@
                 });
 
                 updateScore();
-
-                // Forzar recalculado de posición de fantasma para poner piezas en ráfaga
                 onPointerMove(event);
 
             } else if (activeTool === 'delete') {
@@ -476,7 +495,6 @@
             }
         }
 
-        // --- ACTUALIZAR CONTADORES ---
         function updateScore() {
             let total = 0;
             let countUM = 0, countC = 0, countD = 0, countU = 0;
